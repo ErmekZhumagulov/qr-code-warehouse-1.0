@@ -1,0 +1,160 @@
+from PyQt6 import uic
+from PyQt6.QtWidgets import QApplication, QMessageBox
+import csv
+from datetime import datetime
+
+Form, Window = uic.loadUiType("ui.ui")
+
+app = QApplication([])
+window = Window()
+form = Form()
+form.setupUi(window)
+window.show()
+errorWindow = QMessageBox()
+
+def load_items_from_file(filename):
+    try:
+        with open(filename, 'r', encoding='utf-8') as file:  # Specify UTF-8 encoding
+            items = [line.strip() for line in file.readlines()]
+        return items
+    except Exception as e:
+        print("Error loading items from file:", e)
+        return []
+
+def update_quantity_field():
+    form.quantity_text_field.setFocus()
+    text = form.qr_text_field.text()
+    # print("Content of qr_text_field:", text)
+
+def update_qr_text_field(index):
+    # Set focus to qr_text_field for typing
+    form.qr_text_field.setFocus()
+    # Set the quantity_text_field to "1"
+    form.quantity_text_field.setText("1")
+
+def write_to_csv(selected_item, qr_text_content, quantity_value):
+    # Generate the filename using the current date
+    filename = "logs.csv"
+
+    # Write data to the CSV file
+    with open(filename, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        # Check if the file is empty and write headers if it is
+        if file.tell() == 0:
+            writer.writerow(["Date", "Time", "Selected Item", "Content of qr_text_field", "Quantity value"])
+
+        # Format the current date and time
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_time = datetime.now().strftime("%H:%M:%S")
+
+        writer.writerow([current_date, current_time, selected_item, qr_text_content, quantity_value])
+
+def submit_action():
+    quantity_value = form.quantity_text_field.text()
+    selected_item = form.takers_list.currentText()
+    qr_text_content = form.qr_text_field.text()
+
+    print("Selected Item:", selected_item)
+    print("Content of qr_text_field:", qr_text_content)
+    print("Quantity value:", quantity_value)
+
+    # Write the data to the CSV file
+    write_to_csv(selected_item, qr_text_content, quantity_value)
+
+    # Clear both text fields
+    form.qr_text_field.clear()
+    form.quantity_text_field.clear()
+
+    # Set focus on qr_text_field
+    form.qr_text_field.setFocus()
+    # Set the value of quantity_text_field to "1"
+    form.quantity_text_field.setText("1")
+
+    # Add the new entry to the history list
+    add_history_entry(selected_item, qr_text_content, quantity_value)
+
+# Add a new function to update the history list
+def add_history_entry(selected_item, qr_text_content, quantity_value):
+    # Create a string with the data to display
+    history_entry = f"{selected_item}, {qr_text_content}, {quantity_value}"
+
+    # Add the entry to the QListWidget
+    form.history_list.addItem(history_entry)
+
+# Load history data from the CSV file and populate the QListWidget
+def load_history_from_csv():
+    try:
+        filename = "logs.csv"
+        with open(filename, 'r') as file:
+            reader = csv.reader(file)
+            # Skip the header row
+            next(reader)
+            # Add each entry to the QListWidget
+            for row in reader:
+                history_entry = f"{row[2]}, {row[3]}, {row[4]}"  # Adjust indexes according to your CSV structure
+                form.history_list.addItem(history_entry)
+    except FileNotFoundError:
+        print("History file not found.")
+
+# Call the function to load history when the application starts
+load_history_from_csv()
+
+def clear_quantity_field():
+    # Clear quantity_text_field
+    form.quantity_text_field.clear()
+
+def add_number_to_quantity(number):
+    current_text = form.quantity_text_field.text()
+    new_text = current_text + number
+    form.quantity_text_field.setText(new_text)
+
+def main():
+    try:
+        # Load items from the text file
+        items = load_items_from_file("Список сотрудников.txt")
+
+        # Add items to the comboBox
+        for item in items:
+            form.takers_list.addItem(item)
+
+        # Define the slot function for combo box activation
+        def on_combo_box_activated(index):
+            selected_item = form.takers_list.itemText(index)
+            # print("Selected Item:", selected_item)
+
+        # Connect the activated signal of the comboBox to the slot function
+        form.takers_list.activated.connect(on_combo_box_activated)
+        # Connect the activated signal of the comboBox to the update_qr_text_field slot function
+        form.takers_list.activated.connect(update_qr_text_field)
+
+        # Connect the returnPressed signal of the qr_text_field to update_quantity_field
+        form.qr_text_field.returnPressed.connect(update_quantity_field)
+
+        # Connect the clicked signal of the submit button to the submit_action slot function
+        form.submit_button.clicked.connect(submit_action)
+
+        # Connect the clicked signal of the clear button to the clear_quantity_field slot function
+        form.clear_button.clicked.connect(clear_quantity_field)
+
+        # Connect the number buttons to the add_number_to_quantity function
+        form.number_0.clicked.connect(lambda: add_number_to_quantity("0"))
+        form.number_1.clicked.connect(lambda: add_number_to_quantity("1"))
+        form.number_2.clicked.connect(lambda: add_number_to_quantity("2"))
+        form.number_3.clicked.connect(lambda: add_number_to_quantity("3"))
+        form.number_4.clicked.connect(lambda: add_number_to_quantity("4"))
+        form.number_5.clicked.connect(lambda: add_number_to_quantity("5"))
+        form.number_6.clicked.connect(lambda: add_number_to_quantity("6"))
+        form.number_7.clicked.connect(lambda: add_number_to_quantity("7"))
+        form.number_8.clicked.connect(lambda: add_number_to_quantity("8"))
+        form.number_9.clicked.connect(lambda: add_number_to_quantity("9"))
+
+    except KeyboardInterrupt:
+        app.quit()  # Exit the application if interrupted by the user
+    except Exception as e:
+        print(e)
+
+    # window.showFullScreen()
+    app.exec()
+
+if __name__ == '__main__':
+    main()

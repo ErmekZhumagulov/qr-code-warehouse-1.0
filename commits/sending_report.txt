@@ -1,0 +1,220 @@
+from PyQt6 import uic
+from PyQt6.QtWidgets import QApplication, QMessageBox, QTableWidgetItem, QLineEdit, QPushButton, QVBoxLayout, QWidget, QLabel
+import csv
+from datetime import datetime
+
+Form, Window = uic.loadUiType("ui.ui")
+
+app = QApplication([])
+window = Window()
+form = Form()
+form.setupUi(window)
+window.show()
+errorWindow = QMessageBox()
+
+def load_items_from_file(filename):
+    try:
+        with open(filename, 'r', encoding='utf-8') as file:
+            items = [line.strip() for line in file.readlines()]
+        return items
+    except Exception as e:
+        print("Error loading items from file:", e)
+        return []
+
+def update_quantity_field():
+    form.quantity_text_field.setText("1")
+    form.quantity_text_field.setFocus()
+    text = form.qr_text_field.text()
+
+def update_qr_text_field(index):
+    form.qr_text_field.setFocus()
+    form.quantity_text_field.setText("1")
+
+def write_to_csv(selected_item, qr_text_content, quantity_value):
+    filename = "logs.csv"
+    with open(filename, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        if file.tell() == 0:
+            writer.writerow(["Date", "Time", "Selected Item", "Content of qr_text_field", "Quantity value"])
+
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_time = datetime.now().strftime("%H:%M:%S")
+
+        writer.writerow([current_date, current_time, selected_item, qr_text_content, quantity_value])
+
+def submit_action():
+    quantity_value = form.quantity_text_field.text()
+    selected_item = form.takers_list.currentText()
+    qr_text_content = form.qr_text_field.text()
+
+    write_to_csv(selected_item, qr_text_content, quantity_value)
+
+    form.qr_text_field.clear()
+    form.quantity_text_field.clear()
+
+    form.qr_text_field.setFocus()
+    form.quantity_text_field.setText("1")
+
+    # Update history table with new data
+    load_history_from_csv()
+
+def load_history_from_csv():
+    try:
+        filename = "logs.csv"
+        with open(filename, 'r') as file:
+            reader = csv.reader(file)
+            next(reader)  # Skip the first row (header)
+            data = list(reader)  # Read all rows from CSV into a list
+            data.reverse()  # Reverse the order of rows
+
+            # Clear existing rows in the table
+            form.history_table.setRowCount(0)
+
+            # Populate history_table with reversed data
+            for row_idx, row in enumerate(data):
+                form.history_table.insertRow(row_idx)
+                for col_idx, col in enumerate(row):
+                    item = QTableWidgetItem(col)
+                    form.history_table.setItem(row_idx, col_idx, item)
+    except FileNotFoundError:
+        print("History file not found.")
+    except Exception as e:
+        print("Error loading history from CSV:", e)
+
+def clear_quantity_field():
+    form.quantity_text_field.clear()
+
+def add_number_to_quantity(number):
+    current_text = form.quantity_text_field.text()
+    new_text = current_text + number
+    form.quantity_text_field.setText(new_text)
+
+def show_report_popup():
+    # Create a popup dialog
+    report_dialog = QWidget()
+    report_dialog.setWindowTitle("Отчет")
+
+    # Create widgets for the report dialog
+    report_label = QLabel("Введите пароль")
+    report_text_field = QLineEdit()
+    send_button = QPushButton("Отправить")
+
+    # Create a label for the note
+    note_label_1 = QLabel("(Внимание: при отправке")
+    note_label_2 = QLabel("отчета на почту отображаемые")
+    note_label_3 = QLabel("запчасти переносятся в архивный")
+    note_label_4 = QLabel("файл, и они больше не будут")
+    note_label_5 = QLabel("отображаться в истории)")
+
+    # Create a layout for the report dialog
+    layout = QVBoxLayout()
+    layout.addWidget(report_label)
+    layout.addWidget(report_text_field)
+    layout.addWidget(note_label_1)  # Add the note label
+    layout.addWidget(note_label_2)  # Add the note label
+    layout.addWidget(note_label_3)  # Add the note label
+    layout.addWidget(note_label_4)  # Add the note label
+    layout.addWidget(note_label_5)  # Add the note label
+    layout.addWidget(send_button)
+
+    # Set the layout for the report dialog
+    report_dialog.setLayout(layout)
+
+    # Create QLabel widgets for displaying messages
+    message_label = QLabel()
+
+    def send_report():
+        try:
+            with open("password.txt", "r") as password_file:
+                correct_password = password_file.read().strip()
+        except FileNotFoundError:
+            print("Password file not found.")
+            return
+
+        report_text = report_text_field.text()
+        if report_text == correct_password:
+            message = "Пароль верный. Отчет отправлен."
+            print("Password is correct. Report sent.")
+        else:
+            message = "Неверный пароль. Отчет не отправлен."
+            print("Password is incorrect. Please try again.")
+
+        # Show a pop-up message box
+        msg_box = QMessageBox()
+        msg_box.setWindowTitle("Статус отправки отчета")
+        msg_box.setText(message)
+        msg_box.exec()
+
+        # Clear the report text field
+        report_text_field.clear()
+        report_dialog.close()
+
+    # Connect the send button to the send_report function
+    send_button.clicked.connect(send_report)
+
+    # Show the report dialog
+    report_dialog.show()
+
+# Connect the report button to the show_report_popup function
+form.report_button.clicked.connect(show_report_popup)
+
+def main():
+    try:
+        # Load items from the text file
+        items = load_items_from_file("Список сотрудников.txt")
+
+        # Add items to the comboBox
+        for item in items:
+            form.takers_list.addItem(item)
+
+        # Define the slot function for combo box activation
+        def on_combo_box_activated(index):
+            selected_item = form.takers_list.itemText(index)
+            # print("Selected Item:", selected_item)
+
+        # Connect the activated signal of the comboBox to the slot function
+        form.takers_list.activated.connect(on_combo_box_activated)
+        # Connect the activated signal of the comboBox to the update_qr_text_field slot function
+        form.takers_list.activated.connect(update_qr_text_field)
+
+        # Connect the returnPressed signal of the qr_text_field to update_quantity_field
+        form.qr_text_field.returnPressed.connect(update_quantity_field)
+
+        # Connect the clicked signal of the submit button to the submit_action slot function
+        form.submit_button.clicked.connect(submit_action)
+
+        # Connect the clicked signal of the clear button to the clear_quantity_field slot function
+        form.clear_button.clicked.connect(clear_quantity_field)
+
+        # Connect the number buttons to the add_number_to_quantity function
+        form.number_0.clicked.connect(lambda: add_number_to_quantity("0"))
+        form.number_1.clicked.connect(lambda: add_number_to_quantity("1"))
+        form.number_2.clicked.connect(lambda: add_number_to_quantity("2"))
+        form.number_3.clicked.connect(lambda: add_number_to_quantity("3"))
+        form.number_4.clicked.connect(lambda: add_number_to_quantity("4"))
+        form.number_5.clicked.connect(lambda: add_number_to_quantity("5"))
+        form.number_6.clicked.connect(lambda: add_number_to_quantity("6"))
+        form.number_7.clicked.connect(lambda: add_number_to_quantity("7"))
+        form.number_8.clicked.connect(lambda: add_number_to_quantity("8"))
+        form.number_9.clicked.connect(lambda: add_number_to_quantity("9"))
+
+        # Add columns to the history_table
+        form.history_table.setColumnCount(5)  # Set the number of columns
+        form.history_table.setHorizontalHeaderLabels(["Дата", "Время", "Сотрудник", "Запчасть", "Количество"])  # Set column headers
+
+        # Set the size of the third and fourth columns
+        form.history_table.setColumnWidth(2, form.history_table.columnWidth(2) * 2)  # Third column
+        form.history_table.setColumnWidth(3, form.history_table.columnWidth(3) * 4)  # Fourth column
+
+        # Load history from CSV when the application starts
+        load_history_from_csv()
+
+    except KeyboardInterrupt:
+        app.quit()  # Exit the application if interrupted by the user
+    except Exception as e:
+        print(e)
+
+    app.exec()
+
+if __name__ == '__main__':
+    main()
